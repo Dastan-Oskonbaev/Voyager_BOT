@@ -25,4 +25,4 @@ COPY packages/backend/migrations/ /app/packages/backend/migrations/
 
 EXPOSE 8000
 
-CMD python app/packages/backend/migrations/run_migrations.py && python app/packages/backend/apps/tg_bot/main.py
+CMD python packages/backend/migrations/run_migrations.py && python packages/backend/apps/tg_bot/main.py
