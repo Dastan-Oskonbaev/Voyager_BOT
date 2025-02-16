@@ -19,9 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 # Копируем остальной код проекта в контейнер
-COPY packages/backend/apps/ /app/apps/
-COPY packages/backend/libs/ /app/libs/
-COPY packages/backend/migrations/ /app/migrations/
+COPY packages/backend/apps/ /app/packages/backend/apps/
+COPY packages/backend/libs/ /app/packages/backend/libs/
+COPY packages/backend/migrations/ /app/packages/backend/migrations/
 
 EXPOSE 8000
 
