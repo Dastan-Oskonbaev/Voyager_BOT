@@ -1,0 +1,38 @@
+version: "3.7"
+
+services:
+  db:
+    image: postgres:16.0-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - my-network
+    env_file:
+      - .env
+
+  tg_bot:
+    container_name: tg-bot
+    image: tg-bot
+    profiles: ["tg", "all"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"     # максимальный размер лога в одном файле 30Мб (иначе забивает память сильно)
+        max-file: "3"       # сколько файлов сохранять максимум (ротация)
+    env_file:
+      - .env
+    networks:
+      - my-network
+
+volumes:
+  postgres_data:
+
+networks:
+  my-network:
+    name: my-network
