@@ -13,7 +13,6 @@ services:
   tg_bot:
     container_name: tg-bot
     image: tg-bot
-    profiles: ["tg", "all"]
     build:
       context: .
       dockerfile: Dockerfile
