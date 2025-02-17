@@ -57,7 +57,7 @@ async def callback_query_handler(call: types.CallbackQuery):
             )
             await fn.send_photo_emails(bot, chat_id, call)
         elif call.data == "cancel_send_email":
-            service.delete_pending_photo(chat_id)
+            service.delete_pending_file(chat_id)
             await bot.edit_message_text(
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
@@ -143,16 +143,33 @@ async def message_handler(message: types.Message) -> None:
             await message.answer('Упс! Начни, пожалуйста, заново "/start". Мы кое что обновили')
             return
 
-        if message.text is None and not message.photo:
-            await message.answer('На данный момент можно отправлять только текстовые сообщения...)')
-            return
-
         chat_id = chat['id']
         chat_state = chat['state']
+        if chat_state == ChatState.send_email:
+            if not (message.photo or message.document):
+                await message.answer(
+                    '❌ Это не фото и не файл. Пожалуйста, отправьте изображение или файл для отправки по email.')
+                return
+
+            if message.document:
+                service.save_pending_file(chat_id, message.document.file_id, message.document.file_name)
+                await fn.confirm_send(bot, message, chat_id)
+                return
+
+            if message.photo:
+                photo_id = message.photo[-1].file_id
+                service.save_pending_file(chat_id, photo_id, "photo.jpg")
+                await fn.confirm_send(bot, message, chat_id)
+                return
+
+        else:
+            if message.text is None:
+                await message.answer('На данный момент можно отправлять только текстовые сообщения.')
+                return
+
         message_text = message.text.strip() if message.text else ''
 
-        # ----- Handle main page menu buttons -----
-
+        # ----- Обработка команд главного меню -----
         if message_text == password and chat_state == ChatState.enter_password:
             await fn.go_to_main_page(bot, message, chat_id=chat_id)
             return
@@ -176,23 +193,7 @@ async def message_handler(message: types.Message) -> None:
             )
             return
 
-
-        # ----- Handle Image send to contragents -----
-
-        if chat_state == ChatState.send_email:
-            if not message.photo:
-                await message.answer('❌ Это не фото. Пожалуйста, отправьте изображение для отправки по email.')
-                return
-
-            await fn.confirm_send(bot, message, chat_id)
-            return
-
-        if message.text is None:
-            await message.answer('На данный момент можно отправлять только текстовые сообщения.')
-            return
-
-        # ----- Handle communication with contragents -----
-
+        # ----- Обработка взаимодействия с контрагентами -----
         if chat_state == ChatState.contragents:
             if message_text == "➕ Добавить агента":
                 await repository.update_chat_state(chat_id, ChatState.add_agent_name)
@@ -202,6 +203,10 @@ async def message_handler(message: types.Message) -> None:
                 await repository.update_chat_state(chat_id, ChatState.delete_agent)
                 await message.answer("Введите имя агента, которого нужно удалить:")
                 return
+            elif message_text == "🪪 Список агентов":
+                await fn.show_agent_list(message)
+                return
+
 
         if chat_state == ChatState.add_agent_name:
             pending_data = {"name": message_text}

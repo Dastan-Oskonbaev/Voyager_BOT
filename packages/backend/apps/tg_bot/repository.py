@@ -109,3 +109,17 @@ async def get_agent_by_username(username: str):
         WHERE username = $1
     """
     return await db.fetchrow(query, [username])
+
+
+async def get_all_agents():
+    query = """
+        SELECT array_to_json(array(
+            SELECT json_build_object(
+                'username', username,
+                'email',    email
+            )
+            FROM app.customers
+        ))
+    """
+    result = await db.fetchval(query, [])
+    return json.loads(result) if result else []

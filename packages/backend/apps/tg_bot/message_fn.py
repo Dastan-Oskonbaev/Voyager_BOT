@@ -28,6 +28,7 @@ contragents_keyboard = types.ReplyKeyboardMarkup(
         ],
         [
             types.KeyboardButton(text='🏘 Главное меню'),
+            types.KeyboardButton(text='🪪 Список агентов'),
         ],
     ],
     one_time_keyboard=True,
@@ -96,25 +97,35 @@ async def go_to_send_email_screen(bot: Bot, message: types.Message, chat_id: str
 
 
 async def confirm_send(bot, message, chat_id):
-    photo_id = message.photo[-1].file_id
-    service.save_pending_photo(chat_id, photo_id)
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        filename = "photo.jpg"
+    elif message.document:
+        file_id = message.document.file_id
+        filename = message.document.file_name
+    else:
+        await message.answer("❌ Файл не найден. Пожалуйста, отправьте фото или документ.")
+        return
+    service.save_pending_file(chat_id, file_id, filename)
 
     await message.answer(
-        text="Вы уверены, что хотите отправить это фото по email?",
+        text="Вы уверены, что хотите отправить этот файл по email?",
         reply_markup=confirm_email_send_keyboard
     )
     return
 
 
 async def send_photo_emails(bot, chat_id, call):
-    photo_id = service.get_pending_photo(chat_id)
-    if not photo_id:
-        await call.answer("Фото не найдено или время ожидания истекло. Попробуйте заново.", show_alert=True)
+    pending_data = service.get_pending_file(chat_id)
+    if not pending_data:
+        await call.answer("Файл не найден или время ожидания истекло. Попробуйте заново.", show_alert=True)
         return False
 
-    photo = await bot.get_file(photo_id)
-    file = await bot.download(photo.file_id)
-    photo_bytes = file.read()
+    file_id = pending_data['file_id']
+    filename = pending_data['filename']
+
+    file = await bot.download(file_id)
+    file_bytes = file.read()
 
     contragents = await repository.get_all_contragents_emails()
     if not contragents:
@@ -127,10 +138,10 @@ async def send_photo_emails(bot, chat_id, call):
         task = asyncio.create_task(
             send_email(
                 to_email=contragent_email,
-                subject="📸 Фото для вас",
-                body="Здравствуйте! Высылаем вам запрошенное фото.",
-                attachment=photo_bytes,
-                filename="photo.jpg"
+                subject="📎 Файл для вас",
+                body="Здравствуйте! Высылаем вам запрошенный файл.",
+                attachment=file_bytes,
+                filename=filename
             )
         )
         tasks.append(task)
@@ -138,11 +149,11 @@ async def send_photo_emails(bot, chat_id, call):
 
     await repository.update_chat_state(chat_id, ChatState.main_page)
     await call.message.answer(
-        text='✅ Фото успешно отправлено всем контрагентам по email.\n🏘 Возвращаемся в главное меню.',
+        text='✅ Файл успешно отправлен всем контрагентам по email.\n🏘 Возвращаемся в главное меню.',
         reply_markup=main_page_keyboard,
     )
-    service.delete_pending_photo(chat_id)
-    await call.answer("Фото отправлено!")
+    service.delete_pending_file(chat_id)
+    await call.answer("Файл отправлен!")
     return True
 
 
@@ -192,3 +203,18 @@ async def confirm_agent_deletion(message: types.Message, chat_id: int, username_
         text=f"Подтвердите удаление агента:\nИМЯ: {agent['username']}\nEMAIL: {agent['email']}",
         reply_markup=confirm_keyboard
     )
+
+
+async def show_agent_list(message: types.Message):
+    agents = await repository.get_all_agents()
+
+    if not agents:
+        await message.answer("Список агентов пуст.")
+        return
+
+    response_text = "🪪 Список агентов:\n\n"
+    for agent in agents:
+        response_text += f"👤 {agent['username']} --- {agent['email']}\n"
+
+    await message.answer(text=response_text,
+                         reply_markup=contragents_keyboard)
