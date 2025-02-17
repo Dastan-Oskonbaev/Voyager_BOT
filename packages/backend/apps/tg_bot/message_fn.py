@@ -49,7 +49,7 @@ send_email_keyboard = types.ReplyKeyboardMarkup(
             types.KeyboardButton(text='🏘 Главное меню'),
         ],
     ],
-    input_field_placeholder='Прикрепите изображение',
+    input_field_placeholder='Прикрепите файл или изображение',
     one_time_keyboard=True,
     resize_keyboard=True,
 )
@@ -86,8 +86,8 @@ async def go_to_send_email_screen(bot: Bot, message: types.Message, chat_id: str
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     await message.answer(
         text=(
-            f'🔥 Раздел отправки изображений.\n\n'
-            f'Отправьте мне изображение для отправки по email\n\n'
+            f'🔥 Раздел отправки писем.\n\n'
+            f'Отправьте мне изображение или файл для отправки по email\n\n'
 
         ),
         reply_markup=send_email_keyboard,

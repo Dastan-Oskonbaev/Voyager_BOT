@@ -145,6 +145,13 @@ async def message_handler(message: types.Message) -> None:
 
         chat_id = chat['id']
         chat_state = chat['state']
+
+        message_text = message.text.strip() if message.text else None
+
+        if message_text == '🏘 Главное меню':
+            await fn.go_to_main_page(bot, message, chat_id=chat_id)
+            return
+
         if chat_state == ChatState.send_email:
             if not (message.photo or message.document):
                 await message.answer(
