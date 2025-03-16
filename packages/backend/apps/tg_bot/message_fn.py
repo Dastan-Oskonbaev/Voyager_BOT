@@ -5,54 +5,10 @@ from aiogram.enums import ParseMode
 
 import packages.backend.apps.tg_bot.repository as repository
 import packages.backend.apps.tg_bot.service as service
+import packages.backend.apps.tg_bot.keyboards as kb
 
 from packages.backend.apps.tg_bot.custom_types import ChatState
 from packages.backend.libs.email_sender import send_email
-
-
-main_page_keyboard = types.ReplyKeyboardMarkup(
-    keyboard=[
-        [
-            types.KeyboardButton(text='💡 Контрагенты'),
-            types.KeyboardButton(text='🏞 Отправка Письма'),
-        ],
-    ],
-    resize_keyboard=True,
-)
-
-contragents_keyboard = types.ReplyKeyboardMarkup(
-    keyboard=[
-        [
-            types.KeyboardButton(text='➕ Добавить агента'),
-            types.KeyboardButton(text='🗑 Удалить агента'),
-        ],
-        [
-            types.KeyboardButton(text='🏘 Главное меню'),
-            types.KeyboardButton(text='🪪 Список агентов'),
-        ],
-    ],
-    one_time_keyboard=True,
-    resize_keyboard=True,
-)
-
-
-confirm_email_send_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [
-            types.InlineKeyboardButton(text="Да", callback_data="confirm_send_email"),
-            types.InlineKeyboardButton(text="Отмена", callback_data="cancel_send_email")
-        ]
-    ])
-
-send_email_keyboard = types.ReplyKeyboardMarkup(
-    keyboard=[
-        [
-            types.KeyboardButton(text='🏘 Главное меню'),
-        ],
-    ],
-    input_field_placeholder='Прикрепите файл или изображение',
-    one_time_keyboard=True,
-    resize_keyboard=True,
-)
 
 
 async def go_to_main_page(bot: Bot, message: types.Message, chat_id: str):
@@ -64,7 +20,7 @@ async def go_to_main_page(bot: Bot, message: types.Message, chat_id: str):
             'Давай творить будущее вместе! 🌟\n\n'
             '🏠 Главное меню \n\nВыберите нужный раздел 👇'
         ),
-        reply_markup=main_page_keyboard,
+        reply_markup=kb.main_page_keyboard,
     )
     await repository.update_chat_state(chat_id=chat_id, chat_state=ChatState.main_page)
 
@@ -76,7 +32,7 @@ async def go_to_contragents_screen(bot: Bot, message: types.Message, chat_id: st
             f'🔥 Вы в режиме работы с контрагентами\n\n'
             f'Выберите желаемое действие 👇\n\n'
         ),
-        reply_markup=contragents_keyboard,
+        reply_markup=kb.contragents_keyboard,
         parse_mode=ParseMode.HTML,
     )
     await repository.update_chat_state(chat_id=chat_id, chat_state=ChatState.contragents)
@@ -90,7 +46,7 @@ async def go_to_send_email_screen(bot: Bot, message: types.Message, chat_id: str
             f'Отправьте мне изображение или файл для отправки по email\n\n'
 
         ),
-        reply_markup=send_email_keyboard,
+        reply_markup=kb.send_email_keyboard,
         parse_mode=ParseMode.HTML,
     )
     await repository.update_chat_state(chat_id=chat_id, chat_state=ChatState.send_email)
@@ -110,7 +66,7 @@ async def confirm_send(bot, message, chat_id):
 
     await message.answer(
         text="Вы уверены, что хотите отправить этот файл по email?",
-        reply_markup=confirm_email_send_keyboard
+        reply_markup=kb.confirm_email_send_keyboard
     )
     return
 
@@ -134,12 +90,13 @@ async def send_photo_emails(bot, chat_id, call):
         return False
 
     tasks = []
+    letter_text = await repository.get_letter()
     for contragent_email in contragents:
         task = asyncio.create_task(
             send_email(
                 to_email=contragent_email,
-                subject="📎 Файл для вас",
-                body="Здравствуйте! Высылаем вам запрошенный файл.",
+                subject=letter_text['title'],
+                body=letter_text['text'],
                 attachment=file_bytes,
                 filename=filename
             )
@@ -150,7 +107,7 @@ async def send_photo_emails(bot, chat_id, call):
     await repository.update_chat_state(chat_id, ChatState.main_page)
     await call.message.answer(
         text='✅ Файл успешно отправлен всем контрагентам по email.\n🏘 Возвращаемся в главное меню.',
-        reply_markup=main_page_keyboard,
+        reply_markup=kb.main_page_keyboard,
     )
     service.delete_pending_file(chat_id)
     await call.answer("Файл отправлен!")
@@ -166,16 +123,10 @@ async def confirm_agent_input(message: types.Message, chat_id: int, email_text: 
     pending_data["email"] = email_text
     service.save_pending_agent(chat_id, pending_data)
 
-    confirm_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [
-            types.InlineKeyboardButton(text="Да", callback_data="confirm_add_agent"),
-            types.InlineKeyboardButton(text="Отмена", callback_data="cancel_add_agent")
-        ]
-    ])
-
     await message.answer(
         text=f"Подтвердите добавление агента:\nИмя: {pending_data['name']}\nEmail: {pending_data['email']}",
-        reply_markup=confirm_keyboard
+        reply_markup=kb.confirm_add_keyboard,
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -192,16 +143,9 @@ async def confirm_agent_deletion(message: types.Message, chat_id: int, username_
     pending_data["agent"] = agent
     service.save_pending_deletion(chat_id, pending_data)
 
-    confirm_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [
-            types.InlineKeyboardButton(text="Да", callback_data="confirm_delete_agent"),
-            types.InlineKeyboardButton(text="Отмена", callback_data="cancel_delete_agent")
-        ]
-    ])
-
     await message.answer(
         text=f"Подтвердите удаление агента:\nИМЯ: {agent['username']}\nEMAIL: {agent['email']}",
-        reply_markup=confirm_keyboard
+        reply_markup=kb.confirm_delete_keyboard
     )
 
 
@@ -214,7 +158,14 @@ async def show_agent_list(message: types.Message):
 
     response_text = "🪪 Список агентов:\n\n"
     for agent in agents:
-        response_text += f"👤 {agent['username']} --- {agent['email']}\n"
+        response_text += f"№{agent['client_number']} {agent['username']} --- {agent['email']}\n"
 
     await message.answer(text=response_text,
-                         reply_markup=contragents_keyboard)
+                         reply_markup=kb.contragents_keyboard,
+                         parse_mode=ParseMode.HTML)
+
+
+async def redact_agent(message: types.Message, chat_id: int, client_number: str) -> None:
+    service.save_pending_redact(chat_id, {"client_number": client_number})
+    await message.answer("Выберите, что хотите отредактировать:",
+                         reply_markup=kb.redact_keyboard)

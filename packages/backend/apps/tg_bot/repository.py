@@ -115,6 +115,7 @@ async def get_all_agents():
     query = """
         SELECT array_to_json(array(
             SELECT json_build_object(
+                'client_number', client_number,
                 'username', username,
                 'email',    email
             )
@@ -123,3 +124,53 @@ async def get_all_agents():
     """
     result = await db.fetchval(query, [])
     return json.loads(result) if result else []
+
+
+async def update_agent_username(client_number: str, new_username: str):
+    query = """
+        UPDATE app.customers 
+        SET username = $1 
+        WHERE client_number = $2
+    """
+    await db.execute(query, [new_username, int(client_number)])
+
+
+async def update_agent_email(client_number: str, new_email: str):
+    query = """
+        UPDATE app.customers 
+        SET email = $1 
+        WHERE client_number = $2
+    """
+    await db.execute(query, [new_email, int(client_number)])
+
+
+async def get_letter():
+    query = """
+        SELECT json_build_object(
+            'title', title,
+            'text', text
+        )
+        FROM app.letters
+    """
+    result = await db.fetchval(query, [])
+    return json.loads(result) if result else []
+
+
+async def update_letter_title(new_title: str):
+    query = """
+        UPDATE app.letters
+        SET title = $1,
+            updated_at = timezone('utc'::text, CURRENT_TIMESTAMP)
+        WHERE id = (SELECT id FROM app.letters LIMIT 1)
+    """
+    await db.execute(query, [new_title])
+
+
+async def update_letter_text(new_text: str):
+    query = """
+        UPDATE app.letters
+        SET text = $1,
+            updated_at = timezone('utc'::text, CURRENT_TIMESTAMP)
+        WHERE id = (SELECT id FROM app.letters LIMIT 1)
+    """
+    await db.execute(query, [new_text])

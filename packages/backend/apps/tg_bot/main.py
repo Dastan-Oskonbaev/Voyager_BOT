@@ -10,6 +10,7 @@ from aiogram.filters.command import Command
 import packages.backend.apps.tg_bot.message_fn as fn
 import packages.backend.apps.tg_bot.repository as repository
 import packages.backend.apps.tg_bot.service as service
+import packages.backend.apps.tg_bot.keyboards as kb
 
 from packages.backend.apps.tg_bot.custom_types import ChatState
 from packages.backend.libs.config.tg_config import tg_config
@@ -84,7 +85,7 @@ async def callback_query_handler(call: types.CallbackQuery):
                 message_id=call.message.message_id,
                 reply_markup=None
             )
-            await call.message.answer("Агент успешно добавлен!", reply_markup=fn.contragents_keyboard)
+            await call.message.answer("Агент успешно добавлен!", reply_markup=kb.contragents_keyboard)
             await call.answer("Добавлено!")
 
         elif call.data == "cancel_add_agent":
@@ -96,7 +97,7 @@ async def callback_query_handler(call: types.CallbackQuery):
                 message_id=call.message.message_id,
                 reply_markup=None
             )
-            await call.message.answer("Добавление агента отменено.", reply_markup=fn.contragents_keyboard)
+            await call.message.answer("Добавление агента отменено.", reply_markup=kb.contragents_keyboard)
             await call.answer("Отмена")
         return
     if chat_state == ChatState.delete_agent:
@@ -117,7 +118,7 @@ async def callback_query_handler(call: types.CallbackQuery):
                 message_id=call.message.message_id,
                 reply_markup=None
             )
-            await call.message.answer("Агент успешно удалён!", reply_markup=fn.contragents_keyboard)
+            await call.message.answer("Агент успешно удалён!", reply_markup=kb.contragents_keyboard)
             await call.answer("Удалено!")
 
         elif call.data == "cancel_delete_agent":
@@ -129,8 +130,25 @@ async def callback_query_handler(call: types.CallbackQuery):
                 message_id=call.message.message_id,
                 reply_markup=None
             )
-            await call.message.answer("Удаление агента отменено.", reply_markup=fn.contragents_keyboard)
+            await call.message.answer("Удаление агента отменено.", reply_markup=kb.contragents_keyboard)
             await call.answer("Отмена")
+    if chat_state == ChatState.redact_agent:
+        if call.data == "customer_username":
+            await repository.update_chat_state(chat_id, ChatState.redact_agent_username)
+            await call.message.answer("Введите новое ФИО агента:")
+            await call.answer()
+            return
+        elif call.data == "customer_email":
+            await repository.update_chat_state(chat_id, ChatState.redact_agent_email)
+            await call.message.answer("Введите новый email агента:")
+            await call.answer()
+            return
+        elif call.data == "cancel_redact_agent":
+            service.delete_pending_redact(chat_id)
+            await repository.update_chat_state(chat_id, ChatState.contragents)
+            await call.message.answer("Редактирование агента отменено.", reply_markup=kb.contragents_keyboard)
+            await call.answer()
+            return
     return
 
 
@@ -153,7 +171,7 @@ async def message_handler(message: types.Message) -> None:
             return
 
         if chat_state == ChatState.send_email:
-            if not (message.photo or message.document):
+            if not (message.photo or message.document or message_text):
                 await message.answer(
                     '❌ Это не фото и не файл. Пожалуйста, отправьте изображение или файл для отправки по email.')
                 return
@@ -168,6 +186,27 @@ async def message_handler(message: types.Message) -> None:
                 service.save_pending_file(chat_id, photo_id, "photo.jpg")
                 await fn.confirm_send(bot, message, chat_id)
                 return
+            if message_text:
+                if message_text == '💌 Просмотреть Заголовок и Текст письма':
+                    letter = await repository.get_letter()
+                    if letter:
+                        await message.answer(
+                            f"<b>Заголовок:</b> {letter['title']}\n"
+                            f"<b>Текст:</b> {letter['text']}",
+                            parse_mode=ParseMode.HTML
+                        )
+                    else:
+                        await message.answer("Письмо не найдено.")
+                    return
+                if message_text == '⚙️ Изменить Заголовок письма':
+                    await repository.update_chat_state(chat_id, ChatState.change_letter_title)
+                    await message.answer("Введите новый заголовок письма:")
+                    return
+
+                if message_text == '🛠 Изменить Текст письма':
+                    await repository.update_chat_state(chat_id, ChatState.change_letter_text)
+                    await message.answer("Введите новый текст письма:")
+                    return
 
         else:
             if message.text is None:
@@ -196,7 +235,7 @@ async def message_handler(message: types.Message) -> None:
         if chat_state == ChatState.main_page:
             await message.answer(
                 text='🤷‍♂️ Неизвестная команда. \nВыберите, пожалуйста, в меню нужный пункт 👇',
-                reply_markup=fn.main_page_keyboard,
+                reply_markup=kb.main_page_keyboard,
             )
             return
 
@@ -213,6 +252,10 @@ async def message_handler(message: types.Message) -> None:
             elif message_text == "🪪 Список агентов":
                 await fn.show_agent_list(message)
                 return
+            elif message_text == "🖊 Отредактировать агента":
+                await repository.update_chat_state(chat_id, ChatState.redact_agent)
+                await message.answer("Введите номер агента которого необходимо отредактировать:")
+                return
 
 
         if chat_state == ChatState.add_agent_name:
@@ -228,6 +271,52 @@ async def message_handler(message: types.Message) -> None:
 
         if chat_state == ChatState.delete_agent:
             await fn.confirm_agent_deletion(message, chat_id, message_text)
+            return
+
+        if chat_state == ChatState.redact_agent:
+            await fn.redact_agent(message, chat_id, message_text)
+            return
+
+        if chat_state == ChatState.redact_agent_username:
+            pending_redact = service.get_pending_redact(chat_id)
+            if not pending_redact:
+                await message.answer("Нет данных для редактирования, попробуйте снова.")
+                return
+            client_number = pending_redact.get("client_number")
+            await repository.update_agent_username(client_number, message_text)
+            service.delete_pending_redact(chat_id)
+            await repository.update_chat_state(chat_id, ChatState.contragents)
+            await message.answer("ФИО агента успешно изменено!",
+                                 reply_markup=kb.contragents_keyboard,
+                                 parse_mode=ParseMode.HTML)
+            return
+
+            # Если состояние для редактирования email
+        if chat_state == ChatState.redact_agent_email:
+            pending_redact = service.get_pending_redact(chat_id)
+            if not pending_redact:
+                await message.answer("Нет данных для редактирования, попробуйте снова.")
+                return
+            client_number = pending_redact.get("client_number")
+            await repository.update_agent_email(client_number, message_text)
+            service.delete_pending_redact(chat_id)
+            await repository.update_chat_state(chat_id, ChatState.contragents)
+            await message.answer("Email агента успешно изменён!",
+                                 reply_markup=kb.contragents_keyboard,
+                                 parse_mode=ParseMode.HTML)
+            return
+
+        if chat_state == ChatState.change_letter_title:
+            await repository.update_letter_title(message_text)
+            await repository.update_chat_state(chat_id, ChatState.send_email)
+            await message.answer("Заголовок письма успешно изменён!", reply_markup=kb.send_email_keyboard)
+            return
+
+            # Обработка состояний изменения текста письма
+        if chat_state == ChatState.change_letter_text:
+            await repository.update_letter_text(message_text)
+            await repository.update_chat_state(chat_id, ChatState.send_email)
+            await message.answer("Текст письма успешно изменён!", reply_markup=kb.send_email_keyboard)
             return
 
     except Exception as e:
