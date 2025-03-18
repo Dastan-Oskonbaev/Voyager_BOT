@@ -43,9 +43,12 @@ send_email_keyboard = types.ReplyKeyboardMarkup(
             types.KeyboardButton(text='🛠 Изменить Текст письма'),
         ],
         [
-            types.KeyboardButton(text='🏘 Главное меню'),
+            types.KeyboardButton(text='🕹 Тестовое письмо'),
             types.KeyboardButton(text='💌 Просмотреть Заголовок и Текст письма')
         ],
+        [
+            types.KeyboardButton(text='🏘 Главное меню')
+        ]
     ],
     input_field_placeholder='Прикрепите файл или изображение',
     one_time_keyboard=True,

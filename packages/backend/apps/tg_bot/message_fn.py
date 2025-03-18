@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from aiogram import Bot, types
 from aiogram.enums import ParseMode
@@ -158,7 +159,7 @@ async def show_agent_list(message: types.Message):
 
     response_text = "🪪 Список агентов:\n\n"
     for agent in agents:
-        response_text += f"№{agent['client_number']} {agent['username']} --- {agent['email']}\n"
+        response_text += f"{agent['client_number']}. {agent['username']} --- {agent['email']}\n"
 
     await message.answer(text=response_text,
                          reply_markup=kb.contragents_keyboard,
@@ -167,5 +168,54 @@ async def show_agent_list(message: types.Message):
 
 async def redact_agent(message: types.Message, chat_id: int, client_number: str) -> None:
     service.save_pending_redact(chat_id, {"client_number": client_number})
-    await message.answer("Выберите, что хотите отредактировать:",
+    agent_info = await repository.get_agent_by_client_id(client_number)
+    await message.answer(f"ФИО: {agent_info['username']}\n\nemail: {agent_info['email']}\n\n"
+                         f"Выберите, что хотите отредактировать:",
                          reply_markup=kb.redact_keyboard)
+
+
+async def test_send_photo_email_message(bot, chat_id, message):
+    pending_data = service.get_pending_file(chat_id)
+    if not pending_data:
+        await message.answer("Файл не найден или время ожидания истекло. Попробуйте заново.")
+        return False
+
+    file_id = pending_data['file_id']
+    filename = pending_data['filename']
+
+    # Скачиваем файл
+    file = await bot.download(file_id)
+    file_bytes = file.read()
+
+    # Получаем список email контрагентов
+    contragents = os.getenv('TEST_EMAILS').split(',')
+    if not contragents:
+        await message.answer('❌ Нет контрагентов для отправки.')
+        await repository.update_chat_state(chat_id, ChatState.main_page)
+        return False
+
+    # Получаем заголовок и текст письма
+    letter_text = await repository.get_letter()
+
+    tasks = []
+    for contragent_email in contragents:
+        task = asyncio.create_task(
+            send_email(
+                to_email=contragent_email,
+                subject=letter_text['title'],
+                body=letter_text['text'],
+                attachment=file_bytes,
+                filename=filename
+            )
+        )
+        tasks.append(task)
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Обновляем состояние чата и уведомляем пользователя
+    await repository.update_chat_state(chat_id, ChatState.main_page)
+    await message.answer(
+        text='✅ Файл успешно отправлен всем контрагентам по email.\n🏘 Возвращаемся в главное меню.',
+        reply_markup=kb.main_page_keyboard,
+    )
+    service.delete_pending_file(chat_id)
+    return True

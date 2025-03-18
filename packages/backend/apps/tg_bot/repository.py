@@ -87,11 +87,21 @@ async def get_all_contragents_emails():
 
 
 async def add_contragent(name: str, email: str):
+    number_query = """
+            WITH nums AS (
+                SELECT generate_series(1, (SELECT COALESCE(MAX(client_number), 0) FROM app.customers) + 1) AS num
+            )
+            SELECT MIN(nums.num) AS next_client_number
+            FROM nums
+            LEFT JOIN app.customers ON app.customers.client_number = nums.num
+            WHERE app.customers.client_number IS NULL;
+        """
+    next_client_number = await db.fetchval(number_query, [])
     query = """
-        INSERT INTO app.customers(id, username, email)
-        VALUES($1, $2, $3)
+        INSERT INTO app.customers(id, username, email, client_number)
+        VALUES($1, $2, $3, $4)
     """
-    await db.execute(query, [uuid.uuid4(), name, email])
+    await db.execute(query, [uuid.uuid4(), name, email, next_client_number])
 
 
 async def delete_agent_by_username(username: str):
@@ -120,6 +130,7 @@ async def get_all_agents():
                 'email',    email
             )
             FROM app.customers
+            ORDER BY "client_number"
         ))
     """
     result = await db.fetchval(query, [])
@@ -174,3 +185,12 @@ async def update_letter_text(new_text: str):
         WHERE id = (SELECT id FROM app.letters LIMIT 1)
     """
     await db.execute(query, [new_text])
+
+
+async def get_agent_by_client_id(client_id: str):
+    query = """
+        SELECT email, username
+        FROM app.customers 
+        WHERE client_number = $1
+    """
+    return await db.fetchrow(query, [int(client_id)])

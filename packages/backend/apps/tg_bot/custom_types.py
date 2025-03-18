@@ -11,4 +11,5 @@ class ChatState:
     redact_agent_email='redact_agent_email'
     change_letter_title='change_letter_title'
     change_letter_text='change_letter_text'
+    send_test_email='send_test_email'
 

@@ -170,6 +170,18 @@ async def message_handler(message: types.Message) -> None:
             await fn.go_to_main_page(bot, message, chat_id=chat_id)
             return
 
+        if chat_state == ChatState.send_test_email:
+            if message.document:
+                service.save_pending_file(chat_id, message.document.file_id, message.document.file_name)
+                await fn.test_send_photo_email_message(bot, chat_id, message)
+                return
+
+            if message.photo:
+                photo_id = message.photo[-1].file_id
+                service.save_pending_file(chat_id, photo_id, "photo.jpg")
+                await fn.test_send_photo_email_message(bot, chat_id, message)
+                return
+
         if chat_state == ChatState.send_email:
             if not (message.photo or message.document or message_text):
                 await message.answer(
@@ -200,13 +212,23 @@ async def message_handler(message: types.Message) -> None:
                     return
                 if message_text == '⚙️ Изменить Заголовок письма':
                     await repository.update_chat_state(chat_id, ChatState.change_letter_title)
-                    await message.answer("Введите новый заголовок письма:")
+                    title = await repository.get_letter()
+                    await message.answer(f"<b>Текущий заголовок:</b>\n\n {title['title']}\n\n"
+                                         f"<b>Введите новый заголовок письма:</b>",
+                                         parse_mode=ParseMode.HTML)
                     return
 
                 if message_text == '🛠 Изменить Текст письма':
                     await repository.update_chat_state(chat_id, ChatState.change_letter_text)
-                    await message.answer("Введите новый текст письма:")
+                    title = await repository.get_letter()
+                    await message.answer(f"<b>Текущий текст:</b>\n\n {title['text']}\n\n"
+                                         f"<b>Введите новый текст письма:</b>",
+                                         parse_mode=ParseMode.HTML)
                     return
+                if message_text == '🕹 Тестовое письмо':
+                    await repository.update_chat_state(chat_id, ChatState.send_test_email)
+                    await message.answer(f"Отправьте файл или изображение для отпраки:",
+                                         parse_mode=ParseMode.HTML)
 
         else:
             if message.text is None:
@@ -318,6 +340,7 @@ async def message_handler(message: types.Message) -> None:
             await repository.update_chat_state(chat_id, ChatState.send_email)
             await message.answer("Текст письма успешно изменён!", reply_markup=kb.send_email_keyboard)
             return
+
 
     except Exception as e:
         print('[tg_bot][message_handler] error:', e)
