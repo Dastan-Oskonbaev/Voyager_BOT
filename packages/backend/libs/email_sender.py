@@ -20,7 +20,6 @@ async def send_email(to_email: str, subject: str, body: str, attachment: bytes, 
     maintype, subtype = mime_type.split("/", 1)
 
     if maintype == "image":
-        # Если файл изображение, встраиваем его в HTML-сообщение
         encoded_attachment = base64.b64encode(attachment).decode('utf-8')
         html_body = f"""
             <html>
@@ -33,6 +32,22 @@ async def send_email(to_email: str, subject: str, body: str, attachment: bytes, 
             </html>
             """
         message.add_alternative(html_body, subtype="html")
+        message.add_attachment(
+            attachment,
+            maintype=maintype,
+            subtype=subtype,
+            filename=filename,
+            cid="image1",
+            disposition="inline"
+        )
+
+        # Добавляем изображение как обычное вложение
+        message.add_attachment(
+            attachment,
+            maintype=maintype,
+            subtype=subtype,
+            filename=filename
+        )
     else:
         message.add_attachment(attachment, maintype=maintype, subtype=subtype, filename=filename)
 

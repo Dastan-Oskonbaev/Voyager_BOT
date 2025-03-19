@@ -12,4 +12,6 @@ class ChatState:
     change_letter_title='change_letter_title'
     change_letter_text='change_letter_text'
     send_test_email='send_test_email'
+    add_tester='add_tester'
+    delete_tester='delete_tester'
 

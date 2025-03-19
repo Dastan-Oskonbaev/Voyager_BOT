@@ -21,6 +21,11 @@ contragents_keyboard = types.ReplyKeyboardMarkup(
             types.KeyboardButton(text='🪪 Список агентов'),
         ],
         [
+            types.KeyboardButton(text='➕ Добавить получателя для тестового письма'),
+            types.KeyboardButton(text='🗑 Удалить получателя для тестового письма'),
+        ],
+        [
+            types.KeyboardButton(text='🪪 Список получателей тестового письма'),
             types.KeyboardButton(text='🏘 Главное меню'),
         ],
     ],

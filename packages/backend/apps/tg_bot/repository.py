@@ -194,3 +194,28 @@ async def get_agent_by_client_id(client_id: str):
         WHERE client_number = $1
     """
     return await db.fetchrow(query, [int(client_id)])
+
+
+async def get_testers_emails():
+    query = """
+        SELECT email
+        FROM app.testers 
+        WHERE email IS NOT NULL
+    """
+    return await db.fetch(query, [])
+
+
+async def add_tester(email: str):
+    query = """
+        INSERT INTO app.testers(id, email)
+        VALUES($1, $2)
+    """
+    await db.execute(query, [uuid.uuid4(), email])
+
+
+async def delete_tester(email: str):
+    query = """
+        DELETE FROM app.testers 
+        WHERE email = $1
+    """
+    await db.execute(query, [email])

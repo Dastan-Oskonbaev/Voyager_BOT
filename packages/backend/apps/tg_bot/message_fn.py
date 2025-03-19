@@ -188,7 +188,7 @@ async def test_send_photo_email_message(bot, chat_id, message):
     file_bytes = file.read()
 
     # Получаем список email контрагентов
-    contragents = os.getenv('TEST_EMAILS').split(',')
+    contragents = await repository.get_testers_emails()
     if not contragents:
         await message.answer('❌ Нет контрагентов для отправки.')
         await repository.update_chat_state(chat_id, ChatState.main_page)
@@ -214,7 +214,7 @@ async def test_send_photo_email_message(bot, chat_id, message):
     # Обновляем состояние чата и уведомляем пользователя
     await repository.update_chat_state(chat_id, ChatState.main_page)
     await message.answer(
-        text='✅ Файл успешно отправлен всем контрагентам по email.\n🏘 Возвращаемся в главное меню.',
+        text='✅ Файл успешно отправлен по email для тестового просмотра.\n🏘 Возвращаемся в главное меню.',
         reply_markup=kb.main_page_keyboard,
     )
     service.delete_pending_file(chat_id)

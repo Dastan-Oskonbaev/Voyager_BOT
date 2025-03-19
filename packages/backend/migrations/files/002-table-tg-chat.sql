@@ -1,6 +1,6 @@
 CREATE TYPE app.user_state_enum AS ENUM ('main-page', 'enter-password', 'send-email', 'contragents', 'add_agent_email',
     'add_agent_name', 'delete_agent', 'redact_agent', 'redact_agent_email', 'redact_agent_username',
-    'change_letter_text', 'change_letter_title', 'send_test_email');
+    'change_letter_text', 'change_letter_title', 'send_test_email', 'add_tester', 'delete_tester');
 -- Таблица для конкретно чата телеграм. Здесь не учитываются сообщения с ИИ. Только чисто для настроек.
 CREATE TABLE "app"."chat" (
     "id" uuid NOT NULL,

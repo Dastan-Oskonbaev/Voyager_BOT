@@ -1,9 +1,9 @@
 CREATE TABLE "app"."letters" (
     "id" uuid NOT NULL,
-    "title" varchar(255),
-    "text" varchar(255),
-    "created_at" Timestamp DEFAULT timezone('utc'::text, CURRENT_TIMESTAMP) NOT NULL,
-    "updated_at" Timestamp DEFAULT timezone('utc'::text, CURRENT_TIMESTAMP) NOT NULL,
+    "title" VARCHAR(255),
+    "text" TEXT,
+    "created_at" TIMESTAMP DEFAULT timezone('utc'::text, CURRENT_TIMESTAMP) NOT NULL,
+    "updated_at" TIMESTAMP DEFAULT timezone('utc'::text, CURRENT_TIMESTAMP) NOT NULL,
     PRIMARY KEY ("id")
 );
 

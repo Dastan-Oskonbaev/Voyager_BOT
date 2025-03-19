@@ -227,7 +227,7 @@ async def message_handler(message: types.Message) -> None:
                     return
                 if message_text == '🕹 Тестовое письмо':
                     await repository.update_chat_state(chat_id, ChatState.send_test_email)
-                    await message.answer(f"Отправьте файл или изображение для отпраки:",
+                    await message.answer(f"Отправьте файл или изображение для отправки:",
                                          parse_mode=ParseMode.HTML)
 
         else:
@@ -265,18 +265,44 @@ async def message_handler(message: types.Message) -> None:
         if chat_state == ChatState.contragents:
             if message_text == "➕ Добавить агента":
                 await repository.update_chat_state(chat_id, ChatState.add_agent_name)
-                await message.answer("Введите имя нового агента:")
+                await message.answer("Введите имя нового агента:",
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
                 return
             elif message_text == "🗑 Удалить агента":
                 await repository.update_chat_state(chat_id, ChatState.delete_agent)
-                await message.answer("Введите имя агента, которого нужно удалить:")
+                await message.answer("Введите имя агента, которого нужно удалить:",
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
                 return
             elif message_text == "🪪 Список агентов":
                 await fn.show_agent_list(message)
                 return
             elif message_text == "🖊 Отредактировать агента":
                 await repository.update_chat_state(chat_id, ChatState.redact_agent)
-                await message.answer("Введите номер агента которого необходимо отредактировать:")
+                await message.answer("Введите номер агента которого необходимо отредактировать:",
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
+                return
+            elif message_text == "➕ Добавить получателя для тестового письма":
+                await repository.update_chat_state(chat_id, ChatState.add_tester)
+                await message.answer("Введите email тестировщика которого необходимо добавить:",
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
+                return
+            elif message_text == "🗑 Удалить получателя для тестового письма":
+                await repository.update_chat_state(chat_id, ChatState.delete_tester)
+                await message.answer("Введите email тестировщика которого необходимо добавить:")
+                return
+            elif message_text == "🪪 Список получателей тестового письма":
+                testers = await repository.get_testers_emails()
+                response_text = "🪪 Список агентов:\n\n"
+                for tester in testers:
+                    response_text += f"{tester['email']}\n"
+
+                await message.answer(text=response_text,
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
                 return
 
 
@@ -284,7 +310,9 @@ async def message_handler(message: types.Message) -> None:
             pending_data = {"name": message_text}
             service.save_pending_agent(chat_id, pending_data)
             await repository.update_chat_state(chat_id, ChatState.add_agent_email)
-            await message.answer("Введите email нового агента:")
+            await message.answer("Введите email нового агента:",
+                                     reply_markup=kb.contragents_keyboard,
+                                     parse_mode=ParseMode.HTML)
             return
 
         if chat_state == ChatState.add_agent_email:
@@ -341,6 +369,17 @@ async def message_handler(message: types.Message) -> None:
             await message.answer("Текст письма успешно изменён!", reply_markup=kb.send_email_keyboard)
             return
 
+        if chat_state == ChatState.add_tester:
+            await repository.add_tester(message_text)
+            await repository.update_chat_state(chat_id, ChatState.contragents)
+            await message.answer("Тестировщик успешно добавлен!", reply_markup=kb.contragents_keyboard)
+            return
+
+        if chat_state == ChatState.delete_tester:
+            await repository.delete_tester(message_text)
+            await repository.update_chat_state(chat_id, ChatState.contragents)
+            await message.answer("Тестировщик успешно удален!", reply_markup=kb.contragents_keyboard)
+            return
 
     except Exception as e:
         print('[tg_bot][message_handler] error:', e)
