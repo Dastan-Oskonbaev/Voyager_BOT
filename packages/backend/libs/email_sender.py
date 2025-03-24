@@ -1,59 +1,78 @@
-import aiosmtplib
-import base64
 import mimetypes
+import aiosmtplib
 
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from email.mime.image import MIMEImage
 
 from packages.backend.libs.config.email_sender_config import email_config
 
 
-async def send_email(to_email: str, subject: str, body: str, attachment: bytes, filename: str):
-    message = EmailMessage()
-    message["From"] = email_config.smtp_user
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(body)
+async def send_email(to_email: str, subject: str, body: str, attachments: list):
+    msg = MIMEMultipart("mixed")
+    msg["From"] = email_config.smtp_user
+    msg["To"] = to_email
+    msg["Subject"] = subject
 
-    mime_type, _ = mimetypes.guess_type(filename)
-    if mime_type is None:
-        mime_type = "application/octet-stream"
-    maintype, subtype = mime_type.split("/", 1)
+    related = MIMEMultipart("related")
 
-    if maintype == "image":
-        encoded_attachment = base64.b64encode(attachment).decode('utf-8')
-        html_body = f"""
-            <html>
-              <body>
-                <p>{body}</p>
-                <div style="text-align: center;">
-                  <img src="data:{mime_type};base64,{encoded_attachment}" alt="{filename}" style="max-width: 100%; height: auto; display: block; margin: auto;">
-                </div>
-              </body>
-            </html>
-            """
-        message.add_alternative(html_body, subtype="html")
-        message.add_attachment(
-            attachment,
-            maintype=maintype,
-            subtype=subtype,
-            filename=filename,
-            cid="image1",
-            disposition="inline"
-        )
+    alternative = MIMEMultipart("alternative")
 
-        # Добавляем изображение как обычное вложение
-        message.add_attachment(
-            attachment,
-            maintype=maintype,
-            subtype=subtype,
-            filename=filename
-        )
-    else:
-        message.add_attachment(attachment, maintype=maintype, subtype=subtype, filename=filename)
+    alternative.attach(MIMEText(body, "plain", _charset="utf-8"))
 
+    html_body = f"<html><body><p>{body}</p>"
+
+    inline_images = []
+    other_attachments = []
+
+    for idx, attachment in enumerate(attachments):
+        file_bytes = attachment["data"]
+        filename = attachment["filename"]
+
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        maintype, subtype = mime_type.split("/", 1)
+
+        if maintype == "image":
+            image_part = MIMEImage(file_bytes, _subtype=subtype)
+            cid = f"image_{idx}"
+
+            image_part.add_header("Content-ID", f"<{cid}>")
+            image_part.add_header("Content-Disposition", "inline", filename=filename)
+
+            inline_images.append(image_part)
+
+            html_body += (
+                f'<div style="text-align: center; margin-bottom: 20px;">'
+                f'<img src="cid:{cid}" alt="{filename}" '
+                f'style="max-width: 100%; height: auto; display: block; margin: auto;">'
+                f'</div>'
+            )
+            other_attachments.append((file_bytes, maintype, subtype, filename))
+        else:
+            other_attachments.append((file_bytes, maintype, subtype, filename))
+
+    html_body += "</body></html>"
+
+    alternative.attach(MIMEText(html_body, "html", _charset="utf-8"))
+
+    related.attach(alternative)
+
+    for image_part in inline_images:
+        related.attach(image_part)
+
+    msg.attach(related)
+
+    for file_bytes, maintype, subtype, filename in other_attachments:
+        part = MIMEApplication(file_bytes, _subtype=subtype)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(part)
     try:
         await aiosmtplib.send(
-            message,
+            msg,
             hostname=email_config.smtp_host,
             port=email_config.smtp_port,
             username=email_config.smtp_user,

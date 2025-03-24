@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from aiogram import Bot, types
 from aiogram.enums import ParseMode
@@ -44,13 +43,11 @@ async def go_to_send_email_screen(bot: Bot, message: types.Message, chat_id: str
     await message.answer(
         text=(
             f'🔥 Раздел отправки писем.\n\n'
-            f'Отправьте мне изображение или файл для отправки по email\n\n'
-
         ),
         reply_markup=kb.send_email_keyboard,
         parse_mode=ParseMode.HTML,
     )
-    await repository.update_chat_state(chat_id=chat_id, chat_state=ChatState.send_email)
+    # await repository.update_chat_state(chat_id=chat_id, chat_state=ChatState.send_email)
 
 
 async def confirm_send(bot, message, chat_id):

@@ -163,6 +163,7 @@ async def message_handler(message: types.Message) -> None:
 
         chat_id = chat['id']
         chat_state = chat['state']
+        print(chat_state)
 
         message_text = message.text.strip() if message.text else None
 
@@ -246,7 +247,7 @@ async def message_handler(message: types.Message) -> None:
             await fn.go_to_main_page(bot, message, chat_id=chat_id)
             return
 
-        if message_text == '🏞 Отправка Письма' and chat_state == ChatState.main_page:
+        if message_text == '🏞 Работа с Письмами' and chat_state == ChatState.main_page:
             await fn.go_to_send_email_screen(bot, message, chat_id=chat_id)
             return
 

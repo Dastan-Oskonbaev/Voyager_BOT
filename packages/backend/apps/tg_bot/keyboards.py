@@ -4,7 +4,7 @@ main_page_keyboard = types.ReplyKeyboardMarkup(
     keyboard=[
         [
             types.KeyboardButton(text='💡 Контрагенты'),
-            types.KeyboardButton(text='🏞 Отправка Письма'),
+            types.KeyboardButton(text='🏞 Работа с Письмами'),
         ],
     ],
     resize_keyboard=True,
@@ -43,6 +43,9 @@ confirm_email_send_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
 
 send_email_keyboard = types.ReplyKeyboardMarkup(
     keyboard=[
+        [
+            types.KeyboardButton(text='✉️ Отправка Письма')
+        ],
         [
             types.KeyboardButton(text='⚙️ Изменить Заголовок письма'),
             types.KeyboardButton(text='🛠 Изменить Текст письма'),
